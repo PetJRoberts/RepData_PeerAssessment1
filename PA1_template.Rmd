@@ -1,25 +1,121 @@
 ---
 title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+output: html_document
+keep_md: true
 ---
 
 
 ## Loading and preprocessing the data
 
+First, we will load the activity monitoring data and try to understand what it contains, as well as loading any required libraries
 
+```{r dataload}
+
+require(lattice)
+
+# Unzip data
+datazip<-("./activity.zip")
+
+unzip(datazip)
+
+# Load data
+activity<-read.csv('activity.csv')
+
+# Take a quick look at the data
+head(activity)
+str(activity)
+summary(activity)
+```
+
+We can see that the data contains three variables. These are:
+
+* steps
+* date
+* interval
 
 ## What is mean total number of steps taken per day?
+To find the mean total number of steps per day the data first needs to be aggregated by date. A histogram can then be created and mean and median values displayed 
 
+```{r meansteps}
+dailysteps<-aggregate(steps~date,activity,sum)
 
+hist(dailysteps$steps)
+
+mean(dailysteps$steps)
+median(dailysteps$steps)
+```
 
 ## What is the average daily activity pattern?
+To find the average daily activity pattern the data can be summed by interval and plotted, and the interval with the largest average number of steps
 
+```{r dailyactivity}
 
+averageday<-aggregate(steps~interval,activity,mean)
+
+plot(averageday,type="l")
+
+#interval with highest average number of steps
+averageday[which.max(averageday$steps),]
+```
 
 ## Imputing missing values
+Number of NA values is calculated and the values are replaced using the mean of the average daily steps for that interval.
 
+```{r missing}
+
+sum(is.na(activity$steps))
+
+# Make separate dataframe of N/As
+nas<-activity[is.na(activity$steps),]
+nas$steps<-NULL
+
+
+# and replace the values from the dailysteps calculated
+replacenas<-merge(nas,averageday, by.y="interval")
+
+# Make new dataframe to be completed
+activitycomplete<-activity
+
+activitycomplete$steps[is.na(activitycomplete$steps)] <- replacenas$steps[match(activitycomplete$interval[is.na(activitycomplete$steps)],replacenas$interval)]
+
+# Draw histogram
+hist(activitycomplete$steps)
+
+# Calculate mean and median
+mean(activitycomplete$steps)
+median(activitycomplete$steps)
+
+```
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+The weekday
+
+```{r weekday}
+
+#convert activity to date and add day column
+activitycomplete$date<-as.Date(activitycomplete$date)
+activitycomplete$day<-weekdays(activitycomplete$date)
+
+#Create separate datasets for weekdays and weekends
+weekend<-subset(activitycomplete,day!="Saturday"|day!="Sunday")
+weekday<-subset(activitycomplete,day!="Saturday"&day!="Sunday")
+
+#insert the weekend toggle
+weekend$weekend<-"Weekend"
+weekday$weekend<-"Weekday"
+
+#rbind and aggregate the data
+activitycomplete1<-rbind(weekend,weekday)
+activitycomplete1<-aggregate(steps~interval+weekend,activitycomplete1,mean)
+
+# Plot to compare the two
+
+xyplot(steps~interval|factor(weekend),data=activitycomplete1,
+      type = 'l',
+      xlab = 'Interval',
+      ylab = 'Number of Steps',
+      layout = c(1,2))
+```
+
